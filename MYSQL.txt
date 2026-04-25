@@ -1,0 +1,101 @@
+
+ 1. CREATE PROFIT VIEW
+Note: Joining with products is no longer necessary as orders.csv 
+already contains product_cost, net_revenue, and profit.
+CREATE OR REPLACE VIEW order_profit AS
+SELECT 
+    order_id,
+    primary_category AS category,
+    channel,
+    returned,
+    product_cost,
+    gross_revenue,
+    discount_amount,
+    shipping_cost,
+    platform_fee,
+    transaction_fee,
+    net_revenue,
+    total_costs AS total_cost,
+    profit
+FROM orders;
+
+2. CATEGORY PROFITABILITY
+
+SELECT 
+    category,
+    SUM(net_revenue) AS total_revenue,
+    SUM(total_cost) AS total_cost,
+    SUM(profit) AS total_profit,
+    ROUND(SUM(profit) / SUM(net_revenue) * 100, 2) AS profit_margin
+FROM order_profit
+GROUP BY category
+ORDER BY profit_margin DESC;
+
+TOP & BOTTOM CATEGORY BY TOTAL PROFIT
+SELECT category, SUM(profit) AS profit
+FROM order_profit
+GROUP BY category
+ORDER BY profit DESC LIMIT 1;
+
+SELECT category, SUM(profit) AS profit
+FROM order_profit
+GROUP BY category
+ORDER BY profit ASC LIMIT 1;
+
+COST DRIVERS (Ratios relative to Net Revenue)
+SELECT 
+    category,
+    ROUND(SUM(product_cost) / SUM(net_revenue), 3) AS product_ratio,
+    ROUND(SUM(shipping_cost) / SUM(net_revenue), 3) AS shipping_ratio,
+    ROUND(SUM(platform_fee) / SUM(net_revenue), 3) AS fee_ratio,
+    ROUND(SUM(discount_amount) / SUM(net_revenue), 3) AS discount_ratio
+FROM order_profit
+GROUP BY category;
+
+3. CHANNEL ANALYSIS
+
+SELECT 
+    channel,
+    COUNT(*) AS total_orders,
+    ROUND(AVG(net_revenue), 2) AS avg_order_value,
+    ROUND(AVG(profit), 2) AS avg_profit,
+    ROUND(AVG(platform_fee), 2) AS avg_fee,
+    ROUND(SUM(CASE WHEN returned = 'Yes' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS return_rate
+FROM order_profit
+GROUP BY channel
+ORDER BY total_orders DESC;
+
+ 4. RETURNS IMPACT
+
+SELECT 
+    SUM(net_revenue) AS revenue_lost,
+    SUM(total_cost) AS cost_incurred,
+    SUM(profit) AS profit_impact
+FROM order_profit
+WHERE returned = 'Yes';
+
+ 5. MARKETING ROI
+
+SELECT 
+    platform,
+    SUM(spend) AS total_spend,
+    SUM(clicks) AS total_clicks,
+    SUM(conversions) AS total_conversions,
+    ROUND(SUM(spend) / NULLIF(SUM(conversions), 0), 2) AS CPA,
+    ROUND(SUM(spend) / NULLIF(SUM(clicks), 0), 2) AS CPC,
+    ROUND(SUM(revenue_attributed) / NULLIF(SUM(spend), 0), 2) AS ROAS
+FROM marketing_spend
+GROUP BY platform
+ORDER BY ROAS DESC;
+
+6. IDENTIFYING BUDGET CUTS (LOWEST ROAS)
+
+ Targets for the 20% budget cut based on historical monthly performance
+SELECT 
+    platform,
+    month,
+    spend,
+    roas
+FROM marketing_spend
+ORDER BY roas ASC
+LIMIT 10;
